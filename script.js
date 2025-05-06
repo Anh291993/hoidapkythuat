@@ -1,11 +1,19 @@
 // --- Lấy các element của phần chat ---
-// Giả định các ID này tồn tại trong index.html
 const chatSection = document.getElementById('chat-section');
 const chatBox = document.getElementById('chat-box');
 const userInput = document.getElementById('user-input');
 const sendButton = document.getElementById('send-button');
-const chatList = document.getElementById('chat-list'); // Container chứa các link chat trong sidebar
-const chatTitle = document.getElementById('chat-title'); // Tiêu đề khu vực chat
+
+// Lấy cả hai danh sách link chủ đề (desktop và mobile offcanvas)
+// Chúng ta sẽ dùng class chung '.chat-topic-link' để xử lý sự kiện
+const chatListDesktop = document.getElementById('chat-list-desktop');
+const chatListMobile = document.getElementById('chat-list-mobile'); // Trong offcanvas
+
+// Lấy cả hai tiêu đề (desktop và mobile)
+const chatTitleDesktop = document.getElementById('chat-title-desktop');
+const chatTitleMobile = document.getElementById('chat-title-mobile');
+
+const sidebarOffcanvasElement = document.getElementById('sidebarOffcanvas'); // Element Offcanvas
 
 // --- Biến lưu trữ trạng thái chat hiện tại ---
 let currentWebhookUrl = ''; // URL Webhook của chủ đề đang chọn
@@ -13,11 +21,9 @@ let currentSessionId = '';  // ID DUY NHẤT CHO PHIÊN CHAT HIỆN TẠI
 
 // --- Hàm tạo Session ID duy nhất ---
 function generateSessionId() {
-  // Sử dụng crypto.randomUUID() nếu trình duyệt hỗ trợ (an toàn và chuẩn hơn)
   if (window.crypto && window.crypto.randomUUID) {
     return window.crypto.randomUUID();
   } else {
-    // Fallback đơn giản cho trình duyệt cũ (ít duy nhất hơn)
     console.warn("Browser does not support crypto.randomUUID. Using less reliable fallback.");
     return 'sid-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
   }
@@ -29,10 +35,7 @@ function generateSessionId() {
  * Thêm tin nhắn vào giao diện chat.
  */
 function addChatMessage(sender, text) {
-    if (!chatBox) {
-        console.error("Chat box element not found!");
-        return;
-    }
+    if (!chatBox) { console.error("Chat box element not found!"); return; }
     const messageWrapper = document.createElement('div');
     messageWrapper.classList.add('message-bubble-wrapper');
     if (sender === 'user') messageWrapper.classList.add('user-bubble-wrapper');
@@ -41,19 +44,14 @@ function addChatMessage(sender, text) {
 
     const messageBubble = document.createElement('div');
     messageBubble.classList.add('message-bubble');
-    messageBubble.textContent = text; // An toàn hơn innerHTML
+    messageBubble.textContent = text;
 
-    if (sender === 'user') {
-        messageBubble.classList.add('user-bubble');
-    } else if (sender === 'assistant') {
-        messageBubble.classList.add('assistant-bubble');
-    } else if (sender === 'error') {
-        messageBubble.classList.add('error-bubble');
-    }
+    if (sender === 'user') messageBubble.classList.add('user-bubble');
+    else if (sender === 'assistant') messageBubble.classList.add('assistant-bubble');
+    else if (sender === 'error') messageBubble.classList.add('error-bubble');
 
     messageWrapper.appendChild(messageBubble);
     chatBox.appendChild(messageWrapper);
-    // Cuộn xuống tin nhắn mới nhất
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
 }
 
@@ -62,7 +60,6 @@ function addChatMessage(sender, text) {
  */
 function showTypingIndicator() {
     if (!chatBox || document.getElementById('typing-indicator')) return;
-
     const typingIndicatorWrapper = document.createElement('div');
     typingIndicatorWrapper.id = 'typing-indicator';
     typingIndicatorWrapper.classList.add('message-bubble-wrapper', 'assistant-bubble-wrapper');
@@ -90,13 +87,12 @@ function removeTypingIndicator() {
  * Gửi tin nhắn chat đến webhook hiện tại, bao gồm cả sessionId.
  */
 async function sendChatMessage() {
-    if (!userInput || !sendButton) return; // Kiểm tra element tồn tại
+    if (!userInput || !sendButton) { console.error("Input/Send button not found"); return; }
 
     const question = userInput.value.trim();
 
-    // Kiểm tra xem đã chọn chủ đề (và có URL hợp lệ) chưa
     if (!currentWebhookUrl) {
-        addChatMessage('error', 'Vui lòng chọn một chủ đề chat từ menu bên trái trước.');
+        addChatMessage('error', 'Vui lòng chọn một chủ đề chat từ menu.');
         return;
     }
      if (!currentSessionId) {
@@ -105,39 +101,32 @@ async function sendChatMessage() {
          return;
      }
 
-    if (!question) return; // Không gửi tin nhắn rỗng
+    if (!question) return;
 
     addChatMessage('user', question);
-    userInput.value = ''; // Xóa input sau khi gửi
-    sendButton.disabled = true; // Vô hiệu hóa nút gửi
+    userInput.value = '';
+    sendButton.disabled = true;
 
     showTypingIndicator();
 
-    // Tạo payload bao gồm cả sessionId
     const payload = {
         question: question,
         sessionId: currentSessionId
     };
-
-    console.log("Sending payload:", payload); // Log để debug
+    console.log("Sending payload:", payload);
 
     try {
-        // Sử dụng URL Webhook CHAT hiện tại
         const response = await fetch(currentWebhookUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                // Thêm headers khác nếu cần (vd: Authorization)
-            },
-            body: JSON.stringify(payload), // Gửi payload mới
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
         });
 
-        removeTypingIndicator(); // Xóa chỉ báo khi có phản hồi (thành công hoặc lỗi)
+        removeTypingIndicator();
 
         let data;
-        try {
-             data = await response.json();
-        } catch(e) {
+        try { data = await response.json(); }
+        catch(e) {
              if (!response.ok) throw new Error(`Lỗi HTTP: ${response.status} ${response.statusText}. Phản hồi không phải JSON.`);
              throw new Error(`Phản hồi thành công nhưng không thể phân tích JSON: ${e.message}`);
         }
@@ -146,8 +135,7 @@ async function sendChatMessage() {
              throw new Error(data.message || `Lỗi HTTP: ${response.status} ${response.statusText}`);
         }
 
-        // Xử lý phản hồi thành công
-        const answer = data.answer; // Mong đợi { "answer": "..." } từ webhook chat
+        const answer = data.answer;
         if (answer) {
             addChatMessage('assistant', answer);
         } else {
@@ -156,115 +144,135 @@ async function sendChatMessage() {
         }
 
     } catch (error) {
-         removeTypingIndicator(); // Đảm bảo xóa chỉ báo nếu có lỗi
+        removeTypingIndicator();
         addChatMessage('error', `Lỗi: ${error.message || 'Không thể kết nối đến webhook chat.'}`);
         console.error('Chat fetch error:', error);
     } finally {
-        sendButton.disabled = false; // Kích hoạt lại nút gửi
-        if (userInput) userInput.focus(); // Focus lại ô input
+        sendButton.disabled = false;
+        if (userInput) userInput.focus();
     }
 }
 
 /**
- * Xử lý khi người dùng chọn một chủ đề chat mới từ sidebar.
- * Sẽ tạo sessionId mới cho mỗi lần chọn chủ đề.
+ * Xử lý khi người dùng chọn một chủ đề chat mới từ sidebar hoặc offcanvas.
+ * Sẽ tạo sessionId mới và đóng offcanvas nếu đang mở.
  */
 function setActiveChat(linkElement) {
     if (!linkElement || linkElement.classList.contains('active')) {
-        // Không làm gì nếu link không tồn tại hoặc đã active sẵn rồi
         return;
     }
 
     const webhookUrl = linkElement.dataset.webhookUrl;
-
-    // Kiểm tra xem URL có phải là placeholder không
     if (!webhookUrl || webhookUrl.startsWith('<URL_WEBHOOK_') || webhookUrl.trim() === '') {
         console.warn('Webhook URL chưa được cấu hình cho:', linkElement.textContent.trim());
-        // Có thể hiển thị thông báo lỗi tạm thời hoặc không làm gì cả
+        addChatMessage('error', 'Chủ đề này chưa được cấu hình Webhook.');
         return;
     }
 
     const iconElement = linkElement.querySelector('i');
     const topicName = (iconElement ? linkElement.textContent.replace(iconElement.textContent, '').trim() : linkElement.textContent.trim()) || "Chat";
 
-    // Tạo Session ID mới khi chọn chủ đề mới
     currentSessionId = generateSessionId();
     currentWebhookUrl = webhookUrl;
     console.log(`New session for topic "${topicName}" started. ID: ${currentSessionId}, URL: ${currentWebhookUrl}`);
 
-    if (chatBox) chatBox.innerHTML = ''; // Xóa nội dung chat cũ
-    addChatMessage('assistant', `Bắt đầu chat về chủ đề: ${topicName}.`); // Có thể bỏ hiển thị session ID nếu muốn
+    if (chatBox) chatBox.innerHTML = '';
+    addChatMessage('assistant', `Bắt đầu chat về chủ đề: ${topicName}.`);
 
-    if (chatTitle) chatTitle.textContent = topicName; // Cập nhật tiêu đề
+    // Cập nhật cả hai tiêu đề (desktop và mobile)
+    if (chatTitleDesktop) chatTitleDesktop.textContent = topicName;
+    if (chatTitleMobile) chatTitleMobile.textContent = topicName;
 
-    // Cập nhật trạng thái active cho các link trong sidebar
-    if (chatList) {
-        const allLinks = chatList.querySelectorAll('.chat-topic-link');
-        allLinks.forEach(link => link.classList.remove('active')); // Xóa active ở tất cả
-        linkElement.classList.add('active'); // Thêm active cho link vừa click
+    // Cập nhật trạng thái active cho các link trong CẢ sidebar desktop và offcanvas
+    // Sử dụng querySelectorAll trên document để bắt tất cả các link có class .chat-topic-link
+    const allChatLinks = document.querySelectorAll('.chat-topic-link');
+    allChatLinks.forEach(link => link.classList.remove('active'));
+    linkElement.classList.add('active');
+    // Nếu link được click nằm trong offcanvas, cần đảm bảo link tương ứng ở desktop cũng active (và ngược lại)
+    // Cách đơn giản: tìm link có cùng data-webhook-url và set active cho nó
+    allChatLinks.forEach(otherLink => {
+        if (otherLink !== linkElement && otherLink.dataset.webhookUrl === webhookUrl) {
+            otherLink.classList.add('active');
+        }
+    });
+
+
+    // Đóng Offcanvas nếu nó đang hiển thị (thường là khi click từ mobile)
+    if (sidebarOffcanvasElement && bootstrap.Offcanvas) { // Kiểm tra bootstrap.Offcanvas tồn tại
+        const offcanvasInstance = bootstrap.Offcanvas.getInstance(sidebarOffcanvasElement);
+        if (offcanvasInstance && sidebarOffcanvasElement.classList.contains('show')) {
+            offcanvasInstance.hide();
+        }
     }
 
-    if (userInput) userInput.focus(); // Focus vào ô nhập liệu
+    if (userInput) userInput.focus();
 }
 
 /**
  * Khởi tạo lựa chọn chat, gán sự kiện và chọn chat mặc định.
  */
 function initializeChatSelection() {
-    if (!chatList) {
-        console.error("Không tìm thấy phần tử #chat-list để khởi tạo sidebar.");
-        if (chatTitle) chatTitle.textContent = "Lỗi: Không tìm thấy danh sách chủ đề.";
+    // Lấy tất cả các link chủ đề từ cả desktop và mobile
+    const allChatLinks = document.querySelectorAll('.chat-topic-link');
+
+    if (allChatLinks.length === 0) {
+        const initialMsg = "Không tìm thấy chủ đề chat nào.";
+        if (chatTitleDesktop) chatTitleDesktop.textContent = initialMsg;
+        if (chatTitleMobile) chatTitleMobile.textContent = initialMsg;
+        addChatMessage('error', "Vui lòng kiểm tra cấu hình sidebar trong HTML.");
         return;
     }
 
-    const chatLinks = chatList.querySelectorAll('.chat-topic-link');
-
-    if (chatLinks.length === 0) {
-        if (chatTitle) chatTitle.textContent = "Không có chủ đề nào";
-        addChatMessage('error', "Không tìm thấy chủ đề chat nào trong sidebar.");
-        return;
-    }
-
-    // Gán sự kiện click cho từng link
-    chatLinks.forEach(link => {
+    allChatLinks.forEach(link => {
         link.addEventListener('click', (event) => {
-            event.preventDefault(); // Ngăn link chuyển trang
-            setActiveChat(link); // Gọi hàm xử lý
+            event.preventDefault();
+            setActiveChat(link);
         });
     });
 
-    // Tự động chọn chủ đề đầu tiên có URL hợp lệ làm mặc định
     let defaultLink = null;
-    for(let link of chatLinks) {
+    for(let link of allChatLinks) {
         const url = link.dataset.webhookUrl;
-        // Kiểm tra URL hợp lệ (không phải placeholder và không rỗng)
         if (url && !url.startsWith('<URL_WEBHOOK_') && url.trim() !== '') {
-            defaultLink = link;
-            break; // Tìm thấy link hợp lệ đầu tiên
+            // Ưu tiên link trong desktop sidebar làm default nếu có, nếu không thì lấy link đầu tiên tìm được
+            if(link.closest('#chat-list-desktop')) {
+                 defaultLink = link;
+                 break;
+            }
+            if(!defaultLink) defaultLink = link; // Lưu lại link đầu tiên hợp lệ
+        }
+    }
+     // Nếu không tìm thấy link nào hợp lệ trong desktop, lấy link hợp lệ đầu tiên bất kỳ
+    if (!defaultLink) {
+        for(let link of allChatLinks) {
+            const url = link.dataset.webhookUrl;
+            if (url && !url.startsWith('<URL_WEBHOOK_') && url.trim() !== '') {
+                defaultLink = link;
+                break;
+            }
         }
     }
 
+
     if (defaultLink) {
-        setActiveChat(defaultLink); // Tự động chọn và tạo session ID đầu tiên
+        setActiveChat(defaultLink);
     } else {
-         // Nếu có link nhưng không link nào có URL hợp lệ
-         if (chatTitle) chatTitle.textContent = "Chưa có chủ đề nào sẵn sàng";
+         const errorMsg = "Chưa có chủ đề nào sẵn sàng.";
+         if (chatTitleDesktop) chatTitleDesktop.textContent = errorMsg;
+         if (chatTitleMobile) chatTitleMobile.textContent = errorMsg;
          addChatMessage('error', "Vui lòng cấu hình URL Webhook hợp lệ cho các chủ đề trong file HTML.");
     }
 }
 
 // --- Gán sự kiện & Khởi tạo ---
 document.addEventListener('DOMContentLoaded', () => {
-    // Giả định #chat-section luôn hiển thị
     if (chatSection) {
-        // Đảm bảo phần chat hiển thị (nếu CSS có thể ẩn nó)
-        // chatSection.style.display = 'flex'; // Bỏ comment nếu cần thiết
-        initializeChatSelection(); // Khởi tạo sidebar và chọn chủ đề mặc định
+        // chatSection.style.display = 'flex'; // Đảm bảo nó hiển thị nếu CSS ẩn
+        initializeChatSelection();
     } else {
         console.error("Không tìm thấy phần tử #chat-section.");
     }
 
-    // Gán sự kiện cho nút gửi và ô nhập
     if (sendButton) {
         sendButton.addEventListener('click', sendChatMessage);
     } else {
@@ -273,16 +281,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (userInput) {
         userInput.addEventListener('keypress', function(event) {
-            // Gửi khi nhấn Enter (và không nhấn Shift)
             if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault(); // Ngăn xuống dòng trong input
-                // Chỉ gửi nếu nút gửi không bị vô hiệu hóa
+                event.preventDefault();
                 if (sendButton && !sendButton.disabled) {
                     sendChatMessage();
                 }
             }
         });
-        // Focus vào ô input sau khi mọi thứ sẵn sàng
         setTimeout(() => userInput.focus(), 100);
     } else {
          console.error("Không tìm thấy phần tử #user-input.");

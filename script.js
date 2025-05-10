@@ -1,11 +1,11 @@
 // --- Lấy các element của phần chat ---
+// Giả định các ID này tồn tại trong index.html
 const chatSection = document.getElementById('chat-section');
 const chatBox = document.getElementById('chat-box');
 const userInput = document.getElementById('user-input');
 const sendButton = document.getElementById('send-button');
 
 // Lấy cả hai danh sách link chủ đề (desktop và mobile offcanvas)
-// Chúng ta sẽ dùng class chung '.chat-topic-link' để xử lý sự kiện
 const chatListDesktop = document.getElementById('chat-list-desktop');
 const chatListMobile = document.getElementById('chat-list-mobile'); // Trong offcanvas
 
@@ -33,9 +33,13 @@ function generateSessionId() {
 
 /**
  * Thêm tin nhắn vào giao diện chat.
+ * CẬP NHẬT: Xử lý ký tự \n cho tin nhắn từ assistant và error.
  */
 function addChatMessage(sender, text) {
-    if (!chatBox) { console.error("Chat box element not found!"); return; }
+    if (!chatBox) {
+        console.error("Chat box element not found!");
+        return;
+    }
     const messageWrapper = document.createElement('div');
     messageWrapper.classList.add('message-bubble-wrapper');
     if (sender === 'user') messageWrapper.classList.add('user-bubble-wrapper');
@@ -44,11 +48,23 @@ function addChatMessage(sender, text) {
 
     const messageBubble = document.createElement('div');
     messageBubble.classList.add('message-bubble');
-    messageBubble.textContent = text;
 
-    if (sender === 'user') messageBubble.classList.add('user-bubble');
-    else if (sender === 'assistant') messageBubble.classList.add('assistant-bubble');
-    else if (sender === 'error') messageBubble.classList.add('error-bubble');
+    // <<< THAY ĐỔI Ở ĐÂY: Xử lý \n cho assistant và error messages >>>
+    if (sender === 'assistant' || sender === 'error') {
+        const formattedText = text.replace(/\n/g, '<br>'); // Thay thế tất cả \n bằng <br>
+        messageBubble.innerHTML = formattedText; // Dùng innerHTML để thẻ <br> được render
+    } else {
+        messageBubble.textContent = text; // Tin nhắn người dùng vẫn dùng textContent (an toàn hơn)
+    }
+    // <<< KẾT THÚC THAY ĐỔI >>>
+
+    if (sender === 'user') {
+        messageBubble.classList.add('user-bubble');
+    } else if (sender === 'assistant') {
+        messageBubble.classList.add('assistant-bubble');
+    } else if (sender === 'error') {
+        messageBubble.classList.add('error-bubble');
+    }
 
     messageWrapper.appendChild(messageBubble);
     chatBox.appendChild(messageWrapper);
@@ -103,7 +119,7 @@ async function sendChatMessage() {
 
     if (!question) return;
 
-    addChatMessage('user', question);
+    addChatMessage('user', question); // Tin nhắn người dùng được thêm bằng textContent
     userInput.value = '';
     sendButton.disabled = true;
 
@@ -137,6 +153,7 @@ async function sendChatMessage() {
 
         const answer = data.answer;
         if (answer) {
+            // Câu trả lời từ AI (answer) sẽ được xử lý \n trong hàm addChatMessage
             addChatMessage('assistant', answer);
         } else {
              addChatMessage('error', 'Phản hồi chat nhận được không hợp lệ (thiếu key "answer").');
@@ -145,6 +162,7 @@ async function sendChatMessage() {
 
     } catch (error) {
         removeTypingIndicator();
+        // Thông báo lỗi cũng sẽ được xử lý \n trong hàm addChatMessage nếu có
         addChatMessage('error', `Lỗi: ${error.message || 'Không thể kết nối đến webhook chat.'}`);
         console.error('Chat fetch error:', error);
     } finally {
@@ -179,26 +197,19 @@ function setActiveChat(linkElement) {
     if (chatBox) chatBox.innerHTML = '';
     addChatMessage('assistant', `Bắt đầu chat về chủ đề: ${topicName}.`);
 
-    // Cập nhật cả hai tiêu đề (desktop và mobile)
     if (chatTitleDesktop) chatTitleDesktop.textContent = topicName;
     if (chatTitleMobile) chatTitleMobile.textContent = topicName;
 
-    // Cập nhật trạng thái active cho các link trong CẢ sidebar desktop và offcanvas
-    // Sử dụng querySelectorAll trên document để bắt tất cả các link có class .chat-topic-link
     const allChatLinks = document.querySelectorAll('.chat-topic-link');
     allChatLinks.forEach(link => link.classList.remove('active'));
     linkElement.classList.add('active');
-    // Nếu link được click nằm trong offcanvas, cần đảm bảo link tương ứng ở desktop cũng active (và ngược lại)
-    // Cách đơn giản: tìm link có cùng data-webhook-url và set active cho nó
     allChatLinks.forEach(otherLink => {
         if (otherLink !== linkElement && otherLink.dataset.webhookUrl === webhookUrl) {
             otherLink.classList.add('active');
         }
     });
 
-
-    // Đóng Offcanvas nếu nó đang hiển thị (thường là khi click từ mobile)
-    if (sidebarOffcanvasElement && bootstrap.Offcanvas) { // Kiểm tra bootstrap.Offcanvas tồn tại
+    if (sidebarOffcanvasElement && bootstrap.Offcanvas) {
         const offcanvasInstance = bootstrap.Offcanvas.getInstance(sidebarOffcanvasElement);
         if (offcanvasInstance && sidebarOffcanvasElement.classList.contains('show')) {
             offcanvasInstance.hide();
@@ -212,7 +223,6 @@ function setActiveChat(linkElement) {
  * Khởi tạo lựa chọn chat, gán sự kiện và chọn chat mặc định.
  */
 function initializeChatSelection() {
-    // Lấy tất cả các link chủ đề từ cả desktop và mobile
     const allChatLinks = document.querySelectorAll('.chat-topic-link');
 
     if (allChatLinks.length === 0) {
@@ -234,15 +244,13 @@ function initializeChatSelection() {
     for(let link of allChatLinks) {
         const url = link.dataset.webhookUrl;
         if (url && !url.startsWith('<URL_WEBHOOK_') && url.trim() !== '') {
-            // Ưu tiên link trong desktop sidebar làm default nếu có, nếu không thì lấy link đầu tiên tìm được
             if(link.closest('#chat-list-desktop')) {
                  defaultLink = link;
                  break;
             }
-            if(!defaultLink) defaultLink = link; // Lưu lại link đầu tiên hợp lệ
+            if(!defaultLink) defaultLink = link;
         }
     }
-     // Nếu không tìm thấy link nào hợp lệ trong desktop, lấy link hợp lệ đầu tiên bất kỳ
     if (!defaultLink) {
         for(let link of allChatLinks) {
             const url = link.dataset.webhookUrl;
@@ -252,7 +260,6 @@ function initializeChatSelection() {
             }
         }
     }
-
 
     if (defaultLink) {
         setActiveChat(defaultLink);
@@ -267,7 +274,6 @@ function initializeChatSelection() {
 // --- Gán sự kiện & Khởi tạo ---
 document.addEventListener('DOMContentLoaded', () => {
     if (chatSection) {
-        // chatSection.style.display = 'flex'; // Đảm bảo nó hiển thị nếu CSS ẩn
         initializeChatSelection();
     } else {
         console.error("Không tìm thấy phần tử #chat-section.");

@@ -23,11 +23,34 @@ function generateSessionId() {
   }
 }
 
+// <<< HÀM MỚI: Tiền xử lý Markdown để sửa lỗi từ AI >>>
+/**
+ * Chuẩn hóa văn bản Markdown không chuẩn trước khi phân tích.
+ * @param {string} text - Văn bản thô từ AI.
+ * @returns {string} - Văn bản Markdown đã được sửa lỗi.
+ */
+function preprocessMarkdown(text) {
+    if (!text) return '';
+    let correctedText = text;
+
+    // QUY TẮC 1: Thêm khoảng trắng sau dấu * ở đầu dòng nếu bị thiếu
+    // Ví dụ: Dòng bắt đầu bằng "*Nội dung" sẽ được sửa thành "* Nội dung"
+    // Biểu thức chính quy này tìm các dòng bắt đầu bằng dấu * và theo sau ngay là một ký tự không phải khoảng trắng.
+    correctedText = correctedText.replace(/^(\s*\*)\s*([^\s])/gm, '$1 $2');
+
+    // QUY TẮC 2: Chuyển đổi cú pháp in đậm không chuẩn (***) thành chuẩn (**)
+    // Ví dụ: "***Tiêu đề***" sẽ được sửa thành "**Tiêu đề**"
+    correctedText = correctedText.replace(/\*{3}(.*?)\*{3}/g, '**$1**');
+
+    return correctedText;
+}
+
+
 // --- Logic cho phần Chat ---
 
 /**
  * Thêm tin nhắn vào giao diện chat.
- * CẬP NHẬT: Sử dụng thư viện marked.js để render Markdown từ AI.
+ * CẬP NHẬT: Gọi hàm preprocessMarkdown trước khi dùng marked.js
  */
 function addChatMessage(sender, text) {
     if (!chatBox) { console.error("Chat box element not found!"); return; }
@@ -40,31 +63,23 @@ function addChatMessage(sender, text) {
     const messageBubble = document.createElement('div');
     messageBubble.classList.add('message-bubble');
 
-    // <<< THAY ĐỔI CHÍNH Ở ĐÂY >>>
     if (sender === 'assistant') {
-        // Kiểm tra xem thư viện marked.js đã được tải chưa
         if (typeof marked === 'function') {
-            // Chuyển đổi văn bản Markdown từ AI sang HTML
-            const htmlContent = marked.parse(text);
-            messageBubble.innerHTML = htmlContent; // Dùng innerHTML để render HTML
+            // <<< THAY ĐỔI Ở ĐÂY >>>
+            const correctedMarkdown = preprocessMarkdown(text); // 1. Sửa lỗi Markdown
+            const htmlContent = marked.parse(correctedMarkdown);      // 2. Phân tích Markdown đã sửa
+            messageBubble.innerHTML = htmlContent;
         } else {
-            // Fallback nếu thư viện không tải được
             console.error("marked.js library not found! Displaying raw text with <br>.");
             messageBubble.innerHTML = text.replace(/\n/g, '<br>');
         }
     } else {
-        // Đối với tin nhắn của người dùng hoặc lỗi đơn giản, vẫn dùng textContent
         messageBubble.textContent = text;
     }
-    // <<< KẾT THÚC THAY ĐỔI >>>
 
-    if (sender === 'user') {
-        messageBubble.classList.add('user-bubble');
-    } else if (sender === 'assistant') {
-        messageBubble.classList.add('assistant-bubble');
-    } else if (sender === 'error') {
-        messageBubble.classList.add('error-bubble');
-    }
+    if (sender === 'user') messageBubble.classList.add('user-bubble');
+    else if (sender === 'assistant') messageBubble.classList.add('assistant-bubble');
+    else if (sender === 'error') messageBubble.classList.add('error-bubble');
 
     messageWrapper.appendChild(messageBubble);
     chatBox.appendChild(messageWrapper);
@@ -104,9 +119,7 @@ function removeTypingIndicator() {
  */
 async function sendChatMessage() {
     if (!userInput || !sendButton) { console.error("Input/Send button not found"); return; }
-
     const question = userInput.value.trim();
-
     if (!currentWebhookUrl) {
         addChatMessage('error', 'Vui lòng chọn một chủ đề chat từ menu.');
         return;
@@ -116,50 +129,39 @@ async function sendChatMessage() {
          console.error("currentSessionId is missing!");
          return;
      }
-
     if (!question) return;
-
     addChatMessage('user', question);
     userInput.value = '';
     sendButton.disabled = true;
-
     showTypingIndicator();
-
     const payload = {
         question: question,
         sessionId: currentSessionId
     };
     console.log("Sending payload:", payload);
-
     try {
         const response = await fetch(currentWebhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
         });
-
         removeTypingIndicator();
-
         let data;
         try { data = await response.json(); }
         catch(e) {
              if (!response.ok) throw new Error(`Lỗi HTTP: ${response.status} ${response.statusText}. Phản hồi không phải JSON.`);
              throw new Error(`Phản hồi thành công nhưng không thể phân tích JSON: ${e.message}`);
         }
-
         if (!response.ok) {
              throw new Error(data.message || `Lỗi HTTP: ${response.status} ${response.statusText}`);
         }
-
         const answer = data.answer;
         if (answer) {
-            // Câu trả lời từ AI (answer) sẽ được xử lý Markdown trong hàm addChatMessage
             addChatMessage('assistant', answer);
         } else {
              addChatMessage('error', 'Phản hồi chat nhận được không hợp lệ (thiếu key "answer").');
              console.warn('Chat received data without expected "answer" key:', data);
         }
-
     } catch (error) {
         removeTypingIndicator();
         addChatMessage('error', `Lỗi: ${error.message || 'Không thể kết nối đến webhook chat.'}`);
@@ -177,27 +179,21 @@ function setActiveChat(linkElement) {
     if (!linkElement || linkElement.classList.contains('active')) {
         return;
     }
-
     const webhookUrl = linkElement.dataset.webhookUrl;
     if (!webhookUrl || webhookUrl.startsWith('<URL_WEBHOOK_') || webhookUrl.trim() === '') {
         console.warn('Webhook URL chưa được cấu hình cho:', linkElement.textContent.trim());
         addChatMessage('error', 'Chủ đề này chưa được cấu hình Webhook.');
         return;
     }
-
     const iconElement = linkElement.querySelector('i');
     const topicName = (iconElement ? linkElement.textContent.replace(iconElement.textContent, '').trim() : linkElement.textContent.trim()) || "Chat";
-
     currentSessionId = generateSessionId();
     currentWebhookUrl = webhookUrl;
     console.log(`New session for topic "${topicName}" started. ID: ${currentSessionId}, URL: ${currentWebhookUrl}`);
-
     if (chatBox) chatBox.innerHTML = '';
     addChatMessage('assistant', `Bắt đầu chat về chủ đề: ${topicName}.`);
-
     if (chatTitleDesktop) chatTitleDesktop.textContent = topicName;
     if (chatTitleMobile) chatTitleMobile.textContent = topicName;
-
     const allChatLinks = document.querySelectorAll('.chat-topic-link');
     allChatLinks.forEach(link => link.classList.remove('active'));
     linkElement.classList.add('active');
@@ -206,14 +202,12 @@ function setActiveChat(linkElement) {
             otherLink.classList.add('active');
         }
     });
-
     if (sidebarOffcanvasElement && bootstrap.Offcanvas) {
         const offcanvasInstance = bootstrap.Offcanvas.getInstance(sidebarOffcanvasElement);
         if (offcanvasInstance && sidebarOffcanvasElement.classList.contains('show')) {
             offcanvasInstance.hide();
         }
     }
-
     if (userInput) userInput.focus();
 }
 
@@ -229,14 +223,12 @@ function initializeChatSelection() {
         addChatMessage('error', "Vui lòng kiểm tra cấu hình sidebar trong HTML.");
         return;
     }
-
     allChatLinks.forEach(link => {
         link.addEventListener('click', (event) => {
             event.preventDefault();
             setActiveChat(link);
         });
     });
-
     let defaultLink = null;
     for(let link of allChatLinks) {
         const url = link.dataset.webhookUrl;
@@ -257,7 +249,6 @@ function initializeChatSelection() {
             }
         }
     }
-
     if (defaultLink) {
         setActiveChat(defaultLink);
     } else {
@@ -275,13 +266,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.error("Không tìm thấy phần tử #chat-section.");
     }
-
     if (sendButton) {
         sendButton.addEventListener('click', sendChatMessage);
     } else {
         console.error("Không tìm thấy phần tử #send-button.");
     }
-
     if (userInput) {
         userInput.addEventListener('keypress', function(event) {
             if (event.key === 'Enter' && !event.shiftKey) {

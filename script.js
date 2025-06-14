@@ -23,7 +23,7 @@ function generateSessionId() {
   }
 }
 
-// <<< HÀM MỚI: Tiền xử lý Markdown để sửa lỗi từ AI >>>
+// <<< HÀM ĐƯỢC CẬP NHẬT: Tiền xử lý Markdown để sửa lỗi từ AI >>>
 /**
  * Chuẩn hóa văn bản Markdown không chuẩn trước khi phân tích.
  * @param {string} text - Văn bản thô từ AI.
@@ -33,14 +33,19 @@ function preprocessMarkdown(text) {
     if (!text) return '';
     let correctedText = text;
 
-    // QUY TẮC 1: Thêm khoảng trắng sau dấu * ở đầu dòng nếu bị thiếu
-    // Ví dụ: Dòng bắt đầu bằng "*Nội dung" sẽ được sửa thành "* Nội dung"
-    // Biểu thức chính quy này tìm các dòng bắt đầu bằng dấu * và theo sau ngay là một ký tự không phải khoảng trắng.
-    correctedText = correctedText.replace(/^(\s*\*)\s*([^\s])/gm, '$1 $2');
+    // QUY TẮC 1 (CẢI TIẾN): Thêm khoảng trắng sau dấu * ở đầu dòng nếu bị thiếu.
+    // Biểu thức chính quy này tìm các dòng bắt đầu bằng (các khoảng trắng thụt lề) theo sau là dấu * và ngay lập tức là một ký tự khác.
+    // Nó sẽ chèn một khoảng trắng vào giữa.
+    // Ví dụ: '*Tổng số' -> '* Tổng số'
+    // Ví dụ: '  *Bao gồm' -> '  * Bao gồm'
+    correctedText = correctedText.replace(/^( *)(\*)\s*(?=[^\s*])/gm, '$1$2 ');
 
     // QUY TẮC 2: Chuyển đổi cú pháp in đậm không chuẩn (***) thành chuẩn (**)
     // Ví dụ: "***Tiêu đề***" sẽ được sửa thành "**Tiêu đề**"
     correctedText = correctedText.replace(/\*{3}(.*?)\*{3}/g, '**$1**');
+    
+    // Log để kiểm tra kết quả sau khi sửa lỗi
+    console.log("Corrected Markdown:", correctedText);
 
     return correctedText;
 }
@@ -65,7 +70,6 @@ function addChatMessage(sender, text) {
 
     if (sender === 'assistant') {
         if (typeof marked === 'function') {
-            // <<< THAY ĐỔI Ở ĐÂY >>>
             const correctedMarkdown = preprocessMarkdown(text); // 1. Sửa lỗi Markdown
             const htmlContent = marked.parse(correctedMarkdown);      // 2. Phân tích Markdown đã sửa
             messageBubble.innerHTML = htmlContent;

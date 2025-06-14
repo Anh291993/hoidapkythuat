@@ -1,23 +1,17 @@
 // --- Lấy các element của phần chat ---
-// Giả định các ID này tồn tại trong index.html
 const chatSection = document.getElementById('chat-section');
 const chatBox = document.getElementById('chat-box');
 const userInput = document.getElementById('user-input');
 const sendButton = document.getElementById('send-button');
-
-// Lấy cả hai danh sách link chủ đề (desktop và mobile offcanvas)
 const chatListDesktop = document.getElementById('chat-list-desktop');
-const chatListMobile = document.getElementById('chat-list-mobile'); // Trong offcanvas
-
-// Lấy cả hai tiêu đề (desktop và mobile)
+const chatListMobile = document.getElementById('chat-list-mobile');
 const chatTitleDesktop = document.getElementById('chat-title-desktop');
 const chatTitleMobile = document.getElementById('chat-title-mobile');
-
-const sidebarOffcanvasElement = document.getElementById('sidebarOffcanvas'); // Element Offcanvas
+const sidebarOffcanvasElement = document.getElementById('sidebarOffcanvas');
 
 // --- Biến lưu trữ trạng thái chat hiện tại ---
-let currentWebhookUrl = ''; // URL Webhook của chủ đề đang chọn
-let currentSessionId = '';  // ID DUY NHẤT CHO PHIÊN CHAT HIỆN TẠI
+let currentWebhookUrl = '';
+let currentSessionId = '';
 
 // --- Hàm tạo Session ID duy nhất ---
 function generateSessionId() {
@@ -33,13 +27,10 @@ function generateSessionId() {
 
 /**
  * Thêm tin nhắn vào giao diện chat.
- * CẬP NHẬT: Xử lý ký tự \n cho tin nhắn từ assistant và error.
+ * CẬP NHẬT: Sử dụng thư viện marked.js để render Markdown từ AI.
  */
 function addChatMessage(sender, text) {
-    if (!chatBox) {
-        console.error("Chat box element not found!");
-        return;
-    }
+    if (!chatBox) { console.error("Chat box element not found!"); return; }
     const messageWrapper = document.createElement('div');
     messageWrapper.classList.add('message-bubble-wrapper');
     if (sender === 'user') messageWrapper.classList.add('user-bubble-wrapper');
@@ -49,12 +40,21 @@ function addChatMessage(sender, text) {
     const messageBubble = document.createElement('div');
     messageBubble.classList.add('message-bubble');
 
-    // <<< THAY ĐỔI Ở ĐÂY: Xử lý \n cho assistant và error messages >>>
-    if (sender === 'assistant' || sender === 'error') {
-        const formattedText = text.replace(/\n/g, '<br>'); // Thay thế tất cả \n bằng <br>
-        messageBubble.innerHTML = formattedText; // Dùng innerHTML để thẻ <br> được render
+    // <<< THAY ĐỔI CHÍNH Ở ĐÂY >>>
+    if (sender === 'assistant') {
+        // Kiểm tra xem thư viện marked.js đã được tải chưa
+        if (typeof marked === 'function') {
+            // Chuyển đổi văn bản Markdown từ AI sang HTML
+            const htmlContent = marked.parse(text);
+            messageBubble.innerHTML = htmlContent; // Dùng innerHTML để render HTML
+        } else {
+            // Fallback nếu thư viện không tải được
+            console.error("marked.js library not found! Displaying raw text with <br>.");
+            messageBubble.innerHTML = text.replace(/\n/g, '<br>');
+        }
     } else {
-        messageBubble.textContent = text; // Tin nhắn người dùng vẫn dùng textContent (an toàn hơn)
+        // Đối với tin nhắn của người dùng hoặc lỗi đơn giản, vẫn dùng textContent
+        messageBubble.textContent = text;
     }
     // <<< KẾT THÚC THAY ĐỔI >>>
 
@@ -119,7 +119,7 @@ async function sendChatMessage() {
 
     if (!question) return;
 
-    addChatMessage('user', question); // Tin nhắn người dùng được thêm bằng textContent
+    addChatMessage('user', question);
     userInput.value = '';
     sendButton.disabled = true;
 
@@ -153,7 +153,7 @@ async function sendChatMessage() {
 
         const answer = data.answer;
         if (answer) {
-            // Câu trả lời từ AI (answer) sẽ được xử lý \n trong hàm addChatMessage
+            // Câu trả lời từ AI (answer) sẽ được xử lý Markdown trong hàm addChatMessage
             addChatMessage('assistant', answer);
         } else {
              addChatMessage('error', 'Phản hồi chat nhận được không hợp lệ (thiếu key "answer").');
@@ -162,7 +162,6 @@ async function sendChatMessage() {
 
     } catch (error) {
         removeTypingIndicator();
-        // Thông báo lỗi cũng sẽ được xử lý \n trong hàm addChatMessage nếu có
         addChatMessage('error', `Lỗi: ${error.message || 'Không thể kết nối đến webhook chat.'}`);
         console.error('Chat fetch error:', error);
     } finally {
@@ -173,7 +172,6 @@ async function sendChatMessage() {
 
 /**
  * Xử lý khi người dùng chọn một chủ đề chat mới từ sidebar hoặc offcanvas.
- * Sẽ tạo sessionId mới và đóng offcanvas nếu đang mở.
  */
 function setActiveChat(linkElement) {
     if (!linkElement || linkElement.classList.contains('active')) {
@@ -224,7 +222,6 @@ function setActiveChat(linkElement) {
  */
 function initializeChatSelection() {
     const allChatLinks = document.querySelectorAll('.chat-topic-link');
-
     if (allChatLinks.length === 0) {
         const initialMsg = "Không tìm thấy chủ đề chat nào.";
         if (chatTitleDesktop) chatTitleDesktop.textContent = initialMsg;

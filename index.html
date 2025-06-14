@@ -8,6 +8,25 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
+        .message-bubble.assistant-bubble ul,
+.message-bubble.assistant-bubble ol {
+    padding-left: 20px; /* Thêm thụt lề cho danh sách */
+    margin-top: 5px;
+    margin-bottom: 5px;
+    text-align: left; /* Đảm bảo text trong list căn trái */
+}
+
+.message-bubble.assistant-bubble li {
+    margin-bottom: 5px; /* Khoảng cách giữa các mục trong danh sách */
+}
+
+.message-bubble.assistant-bubble p:first-child {
+    margin-top: 0;
+}
+
+.message-bubble.assistant-bubble p:last-child {
+    margin-bottom: 0;
+}
         /* CSS tùy chỉnh */
         html, body {
             height: 100%;

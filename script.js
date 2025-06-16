@@ -137,15 +137,25 @@ function addChatMessage(sender, text) {
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
 }
 
+// <<< HÀM ĐƯỢC CẬP NHẬT LẦN CUỐI - BIỂU THỨC REGEX MẠNH HƠN >>>
 /**
- * Tiền xử lý Markdown để sửa lỗi từ AI.
+ * Chuẩn hóa văn bản Markdown không chuẩn trước khi phân tích.
+ * @param {string} text - Văn bản thô từ AI.
+ * @returns {string} - Văn bản Markdown đã được sửa lỗi.
  */
 function preprocessMarkdown(text) {
     if (!text) return '';
     let correctedText = text;
-    correctedText = correctedText.replace(/^( *)(\*)\s*(?=[^\s*])/gm, '$1$2 ');
+
+    // QUY TẮC 1 (CẢI TIẾN MẠNH MẼ): Tìm chính xác dòng bắt đầu bằng * mà không có khoảng trắng theo sau, và chèn khoảng trắng vào.
+    // Ví dụ: '*Tổng số' -> '* Tổng số'. Nó sẽ không ảnh hưởng đến dòng đã có khoảng trắng sẵn.
+    correctedText = correctedText.replace(/^( *)(\*)[ ]*([^\s*])/gm, '$1$2 $3');
+
+    // QUY TẮC 2: Chuyển đổi cú pháp in đậm (nếu AI vẫn dùng ***) thành chuẩn (**)
     correctedText = correctedText.replace(/\*{3}(.*?)\*{3}/g, '**$1**');
-    console.log("Corrected Markdown:", correctedText);
+    
+    console.log("Markdown sau khi được tự động sửa lỗi:", correctedText); // Dòng log để kiểm tra
+
     return correctedText;
 }
 

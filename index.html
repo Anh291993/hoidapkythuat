@@ -9,25 +9,6 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <style>
-        .message-bubble.assistant-bubble strong {
-    font-weight: 600;
-}
-
-.message-bubble.assistant-bubble ul {
-    padding-left: 1.25rem;
-    margin-top: 0.5rem;
-    margin-bottom: 0.75rem;
-    list-style-type: disc;
-}
-
-.message-bubble.assistant-bubble li {
-    margin-bottom: 0.25rem;
-}
-
-.message-bubble.assistant-bubble p {
-    margin: 0.5rem 0;
-    line-height: 1.5;
-}
         /* CSS tùy chỉnh */
         html, body {
             height: 100%;
@@ -137,21 +118,24 @@
             line-height: 1.4;
         }
         /* CSS cho danh sách được render từ Markdown */
-        .message-bubble.assistant-bubble ul,
-        .message-bubble.assistant-bubble ol {
-            padding-left: 20px;
-            margin-top: 5px;
-            margin-bottom: 5px;
-            text-align: left;
+        .message-bubble.assistant-bubble ul {
+        padding-left: 1.2rem;
+        margin-top: 0.5rem;
+        margin-bottom: 0.75rem;
+        list-style-type: disc;
         }
+
         .message-bubble.assistant-bubble li {
-            margin-bottom: 5px;
+        margin-bottom: 0.25rem;
         }
-        .message-bubble.assistant-bubble p:first-child {
-            margin-top: 0;
+
+        .message-bubble.assistant-bubble p {
+        margin: 0.5rem 0;
+        line-height: 1.5;
         }
-        .message-bubble.assistant-bubble p:last-child {
-            margin-bottom: 0;
+
+        .message-bubble.assistant-bubble strong {
+        font-weight: bold;
         }
 
         .user-bubble { background-color: #0d6efd; color: white; border-bottom-right-radius: 0.25rem !important; }

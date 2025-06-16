@@ -147,15 +147,22 @@ function preprocessMarkdown(text) {
     if (!text) return '';
     let correctedText = text;
 
-    // QUY TẮC 1 (CẢI TIẾN MẠNH MẼ): Tìm chính xác dòng bắt đầu bằng * mà không có khoảng trắng theo sau, và chèn khoảng trắng vào.
-    // Ví dụ: '*Tổng số' -> '* Tổng số'. Nó sẽ không ảnh hưởng đến dòng đã có khoảng trắng sẵn.
+    // QUY TẮC 1 (Giữ nguyên): Đảm bảo có khoảng trắng sau dấu hoa thị của danh sách.
+    // Ví dụ: '*Tổng số' -> '* Tổng số'.
     correctedText = correctedText.replace(/^( *)(\*)[ ]*([^\s*])/gm, '$1$2 $3');
 
-    // QUY TẮC 2: Chuyển đổi cú pháp in đậm (nếu AI vẫn dùng ***) thành chuẩn (**)
+    // >>> THÊM MỚI - QUY TẮC 2 <<<
+    // Đảm bảo có một dòng trống giữa một đoạn văn bản/tiêu đề và một danh sách.
+    // Nó sẽ tìm một dòng không phải là mục danh sách, theo sau là một dòng là mục danh sách,
+    // và chèn một dòng trống vào giữa.
+    // Ví dụ: "Heading\n* Item" -> "Heading\n\n* Item"
+    correctedText = correctedText.replace(/([^\n])\n(\* )/g, '$1\n\n$2');
+
+
+    // QUY TẮC 3 (Giữ nguyên): Chuyển đổi cú pháp in đậm (nếu AI vẫn dùng ***) thành chuẩn (**)
     correctedText = correctedText.replace(/\*{3}(.*?)\*{3}/g, '**$1**');
     
     console.log("Markdown sau khi được tự động sửa lỗi:", correctedText); // Dòng log để kiểm tra
-
     return correctedText;
 }
 

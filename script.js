@@ -9,6 +9,9 @@ const chatTitleDesktop = document.getElementById('chat-title-desktop');
 const chatTitleMobile = document.getElementById('chat-title-mobile');
 const sidebarOffcanvasElement = document.getElementById('sidebarOffcanvas');
 
+// <<< THÊM MỚI: Lấy element nút giọng nói >>>
+const voiceInputButton = document.getElementById('voice-input-button');
+
 // --- Biến lưu trữ trạng thái chat hiện tại ---
 let currentWebhookUrl = '';
 let currentSessionId = '';
@@ -23,39 +26,83 @@ function generateSessionId() {
   }
 }
 
-// <<< HÀM ĐƯỢC CẬP NHẬT: Tiền xử lý Markdown để sửa lỗi từ AI >>>
-/**
- * Chuẩn hóa văn bản Markdown không chuẩn trước khi phân tích.
- * @param {string} text - Văn bản thô từ AI.
- * @returns {string} - Văn bản Markdown đã được sửa lỗi.
- */
-function preprocessMarkdown(text) {
-    if (!text) return '';
-    let correctedText = text;
+// <<< THÊM MỚI: LOGIC XỬ LÝ GIỌNG NÓI >>>
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition;
 
-    // QUY TẮC 1 (CẢI TIẾN): Thêm khoảng trắng sau dấu * ở đầu dòng nếu bị thiếu.
-    // Biểu thức chính quy này tìm các dòng bắt đầu bằng (các khoảng trắng thụt lề) theo sau là dấu * và ngay lập tức là một ký tự khác.
-    // Nó sẽ chèn một khoảng trắng vào giữa.
-    // Ví dụ: '*Tổng số' -> '* Tổng số'
-    // Ví dụ: '  *Bao gồm' -> '  * Bao gồm'
-    correctedText = correctedText.replace(/^( *)(\*)\s*(?=[^\s*])/gm, '$1$2 ');
+// Kiểm tra trình duyệt có hỗ trợ Web Speech API không
+if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'vi-VN'; // Thiết lập ngôn ngữ nhận dạng là Tiếng Việt
+    recognition.interimResults = false; // Chỉ trả về kết quả cuối cùng
+    recognition.maxAlternatives = 1;
 
-    // QUY TẮC 2: Chuyển đổi cú pháp in đậm không chuẩn (***) thành chuẩn (**)
-    // Ví dụ: "***Tiêu đề***" sẽ được sửa thành "**Tiêu đề**"
-    correctedText = correctedText.replace(/\*{3}(.*?)\*{3}/g, '**$1**');
-    
-    // Log để kiểm tra kết quả sau khi sửa lỗi
-    console.log("Corrected Markdown:", correctedText);
+    // Sự kiện khi bắt đầu lắng nghe
+    recognition.onstart = function() {
+        console.log("Voice recognition started. Try speaking into the microphone.");
+        voiceInputButton.classList.add('is-listening'); // Thêm class để tạo hiệu ứng
+        voiceInputButton.disabled = true; // Vô hiệu hóa nút khi đang nghe
+    };
 
-    return correctedText;
+    // Sự kiện khi kết thúc lắng nghe
+    recognition.onend = function() {
+        console.log("Voice recognition ended.");
+        voiceInputButton.classList.remove('is-listening'); // Bỏ class hiệu ứng
+        voiceInputButton.disabled = false; // Bật lại nút
+    };
+
+    // Sự kiện khi có kết quả
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        console.log("Transcript:", transcript);
+        userInput.value = transcript; // Điền văn bản vào ô input
+
+        // Tự động gửi tin nhắn sau khi nhận dạng xong
+        // Đặt một khoảng trễ nhỏ để người dùng thấy được văn bản trước khi gửi
+        setTimeout(() => {
+            if (userInput.value.trim() !== "") {
+                sendChatMessage();
+            }
+        }, 300);
+    };
+
+    // Sự kiện khi có lỗi
+    recognition.onerror = function(event) {
+        console.error("Speech recognition error", event.error);
+        let errorMessage = "Đã xảy ra lỗi khi nhận dạng giọng nói.";
+        if (event.error == 'no-speech') {
+            errorMessage = "Không phát hiện thấy giọng nói. Vui lòng thử lại.";
+        } else if (event.error == 'not-allowed') {
+            errorMessage = "Bạn cần cấp quyền truy cập micro để sử dụng tính năng này.";
+        }
+        addChatMessage('error', errorMessage);
+    };
+
+    // Gán sự kiện click cho nút micro
+    voiceInputButton.addEventListener('click', () => {
+        if (recognition && recognition.start) {
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error("Could not start recognition", e);
+                addChatMessage('error', 'Không thể bắt đầu nhận dạng giọng nói.');
+            }
+        }
+    });
+
+} else {
+    // Ẩn nút micro nếu trình duyệt không hỗ trợ
+    console.warn("Web Speech API is not supported in this browser.");
+    if (voiceInputButton) {
+        voiceInputButton.style.display = 'none';
+    }
 }
 
 
-// --- Logic cho phần Chat ---
+// --- Logic cho phần Chat (giữ nguyên các hàm đã có) ---
 
 /**
  * Thêm tin nhắn vào giao diện chat.
- * CẬP NHẬT: Gọi hàm preprocessMarkdown trước khi dùng marked.js
  */
 function addChatMessage(sender, text) {
     if (!chatBox) { console.error("Chat box element not found!"); return; }
@@ -70,8 +117,8 @@ function addChatMessage(sender, text) {
 
     if (sender === 'assistant') {
         if (typeof marked === 'function') {
-            const correctedMarkdown = preprocessMarkdown(text); // 1. Sửa lỗi Markdown
-            const htmlContent = marked.parse(correctedMarkdown);      // 2. Phân tích Markdown đã sửa
+            const correctedMarkdown = preprocessMarkdown(text);
+            const htmlContent = marked.parse(correctedMarkdown);
             messageBubble.innerHTML = htmlContent;
         } else {
             console.error("marked.js library not found! Displaying raw text with <br>.");
@@ -88,6 +135,18 @@ function addChatMessage(sender, text) {
     messageWrapper.appendChild(messageBubble);
     chatBox.appendChild(messageWrapper);
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+}
+
+/**
+ * Tiền xử lý Markdown để sửa lỗi từ AI.
+ */
+function preprocessMarkdown(text) {
+    if (!text) return '';
+    let correctedText = text;
+    correctedText = correctedText.replace(/^( *)(\*)\s*(?=[^\s*])/gm, '$1$2 ');
+    correctedText = correctedText.replace(/\*{3}(.*?)\*{3}/g, '**$1**');
+    console.log("Corrected Markdown:", correctedText);
+    return correctedText;
 }
 
 /**
@@ -122,6 +181,7 @@ function removeTypingIndicator() {
  * Gửi tin nhắn chat đến webhook hiện tại, bao gồm cả sessionId.
  */
 async function sendChatMessage() {
+    // ... (Toàn bộ hàm này giữ nguyên như trước)
     if (!userInput || !sendButton) { console.error("Input/Send button not found"); return; }
     const question = userInput.value.trim();
     if (!currentWebhookUrl) {
@@ -180,6 +240,7 @@ async function sendChatMessage() {
  * Xử lý khi người dùng chọn một chủ đề chat mới từ sidebar hoặc offcanvas.
  */
 function setActiveChat(linkElement) {
+    // ... (Toàn bộ hàm này giữ nguyên như trước)
     if (!linkElement || linkElement.classList.contains('active')) {
         return;
     }
@@ -219,6 +280,7 @@ function setActiveChat(linkElement) {
  * Khởi tạo lựa chọn chat, gán sự kiện và chọn chat mặc định.
  */
 function initializeChatSelection() {
+    // ... (Toàn bộ hàm này giữ nguyên như trước)
     const allChatLinks = document.querySelectorAll('.chat-topic-link');
     if (allChatLinks.length === 0) {
         const initialMsg = "Không tìm thấy chủ đề chat nào.";
@@ -265,6 +327,7 @@ function initializeChatSelection() {
 
 // --- Gán sự kiện & Khởi tạo ---
 document.addEventListener('DOMContentLoaded', () => {
+    // ... (Toàn bộ phần này giữ nguyên như trước)
     if (chatSection) {
         initializeChatSelection();
     } else {

@@ -1,50 +1,4 @@
 // --- Lấy các element của phần chat ---
-const chatSection = document.getElementById('chat-section');
-const chatBox = document.getElementById('chat-box');
-const userInput = document.getElementById('user-input');
-const sendButton = document.getElementById('send-button');
-const chatListDesktop = document.getElementById('chat-list-desktop');
-const chatListMobile = document.getElementById('chat-list-mobile');
-const chatTitleDesktop = document.getElementById('chat-title-desktop');
-const chatTitleMobile = document.getElementById('chat-title-mobile');
-const sidebarOffcanvasElement = document.getElementById('sidebarOffcanvas');
-const voiceInputButton = document.getElementById('voice-input-button');
-
-let currentWebhookUrl = '';
-let currentSessionId = '';
-
-function generateSessionId() {
-  if (window.crypto && window.crypto.randomUUID) {
-    return window.crypto.randomUUID();
-  } else {
-    return 'sid-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
-  }
-}
-
-// === Giọng nói ===
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognition;
-
-if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'vi-VN';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-        voiceInputButton.classList.add('is-listening');
-        voiceInputButton.disabled = true;
-    };
-
-    recognition.onend = () => {
-        voiceInputButton.classList.remove('is-listening');
-        voiceInputButton.disabled = false;
-    };
-
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        userInput.value = transcript;
-        setTimeout(() => {
             if (userInput.value.trim() !== "") {
                 sendChatMessage();
             }
@@ -83,9 +37,19 @@ function addChatMessage(sender, text) {
     const messageBubble = document.createElement('div');
     messageBubble.classList.add('message-bubble');
 
-    if (sender === 'assistant' && typeof marked === 'function') {
-        const correctedMarkdown = preprocessMarkdown(text);
-        messageBubble.innerHTML = marked.parse(correctedMarkdown);
+    if (sender === 'assistant') {
+        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+            const correctedMarkdown = preprocessMarkdown(text);
+            try {
+                messageBubble.innerHTML = marked.parse(correctedMarkdown);
+            } catch (e) {
+                console.error("Lỗi khi parse markdown:", e);
+                messageBubble.innerHTML = correctedMarkdown.replace(/\n/g, '<br>');
+            }
+        } else {
+            console.warn("marked.js chưa được load hoặc không hỗ trợ parse.");
+            messageBubble.innerHTML = text.replace(/\n/g, '<br>');
+        }
     } else {
         messageBubble.textContent = text;
     }
@@ -105,7 +69,7 @@ function preprocessMarkdown(text) {
     let correctedText = text;
     correctedText = correctedText.replace(/^( *)(\*)[ ]*([^\s*])/gm, '$1$2 $3');
     correctedText = correctedText.replace(/\*{3}(.*?)\*{3}/g, '**$1**');
-    correctedText = correctedText.replace(/\n(\* \*\*.*?\*\*:)/g, '\n\n$1');
+    correctedText = correctedText.replace(/\n(\* \*\*.*?\*\*:\)/g, '\n\n$1');
     correctedText = correctedText.replace(/\* \*\*(.*?)\*\*:/g, '* **$1**:\n');
     return correctedText;
 }
@@ -131,97 +95,3 @@ function removeTypingIndicator() {
 }
 
 async function sendChatMessage() {
-    const question = userInput.value.trim();
-    if (!currentWebhookUrl) {
-        addChatMessage('error', 'Vui lòng chọn một chủ đề chat từ menu.');
-        return;
-    }
-    if (!currentSessionId) {
-        addChatMessage('error', 'Lỗi: Không thể tạo ID phiên chat.');
-        return;
-    }
-    if (!question) return;
-
-    addChatMessage('user', question);
-    userInput.value = '';
-    sendButton.disabled = true;
-    showTypingIndicator();
-
-    try {
-        const res = await fetch(currentWebhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question, sessionId: currentSessionId })
-        });
-
-        removeTypingIndicator();
-        const data = await res.json();
-
-        if (!res.ok || !data.answer) {
-            throw new Error(data.message || 'Phản hồi không hợp lệ.');
-        }
-        addChatMessage('assistant', data.answer);
-    } catch (error) {
-        removeTypingIndicator();
-        addChatMessage('error', `Lỗi: ${error.message}`);
-    } finally {
-        sendButton.disabled = false;
-        userInput.focus();
-    }
-}
-
-function setActiveChat(linkElement) {
-    if (!linkElement || linkElement.classList.contains('active')) return;
-
-    const webhookUrl = linkElement.dataset.webhookUrl;
-    if (!webhookUrl) {
-        addChatMessage('error', 'Chủ đề này chưa được cấu hình Webhook.');
-        return;
-    }
-
-    const iconElement = linkElement.querySelector('i');
-    const topicName = iconElement
-        ? linkElement.textContent.replace(iconElement.textContent, '').trim()
-        : linkElement.textContent.trim();
-
-    currentSessionId = generateSessionId();
-    currentWebhookUrl = webhookUrl;
-
-    chatBox.innerHTML = '';
-    addChatMessage('assistant', `Bắt đầu chat về chủ đề: ${topicName}`);
-    chatTitleDesktop.textContent = topicName;
-    chatTitleMobile.textContent = topicName;
-
-    document.querySelectorAll('.chat-topic-link').forEach(link => link.classList.remove('active'));
-    linkElement.classList.add('active');
-
-    if (sidebarOffcanvasElement && bootstrap.Offcanvas) {
-        const instance = bootstrap.Offcanvas.getInstance(sidebarOffcanvasElement);
-        if (instance) instance.hide();
-    }
-}
-
-function initializeChatSelection() {
-    const allChatLinks = document.querySelectorAll('.chat-topic-link');
-    allChatLinks.forEach(link => {
-        link.addEventListener('click', (event) => {
-            event.preventDefault();
-            setActiveChat(link);
-        });
-    });
-
-    const defaultLink = [...allChatLinks].find(link => link.dataset.webhookUrl);
-    if (defaultLink) setActiveChat(defaultLink);
-    else addChatMessage('error', 'Không có chủ đề nào sẵn sàng.');
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    initializeChatSelection();
-    sendButton.addEventListener('click', sendChatMessage);
-    userInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            if (!sendButton.disabled) sendChatMessage();
-        }
-    });
-});

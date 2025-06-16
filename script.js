@@ -67,28 +67,29 @@ if (SpeechRecognition) {
     };
 
     // Sự kiện khi có lỗi
-    recognition.onerror = function(event) {
-        console.error("Speech recognition error", event.error);
-        let errorMessage = "Đã xảy ra lỗi khi nhận dạng giọng nói.";
-        if (event.error == 'no-speech') {
-            errorMessage = "Không phát hiện thấy giọng nói. Vui lòng thử lại.";
-        } else if (event.error == 'not-allowed') {
-            errorMessage = "Bạn cần cấp quyền truy cập micro để sử dụng tính năng này.";
-        }
-        addChatMessage('error', errorMessage);
-    };
+ recognition.onerror = function(event) {
+    console.error("Speech recognition error details:", event); // Log chi tiết lỗi ra console
+    let errorMessage = `Đã xảy ra lỗi: ${event.error}`; // Hiển thị tên lỗi
 
-    // Gán sự kiện click cho nút micro
-    voiceInputButton.addEventListener('click', () => {
-        if (recognition && recognition.start) {
-            try {
-                recognition.start();
-            } catch (e) {
-                console.error("Could not start recognition", e);
-                addChatMessage('error', 'Không thể bắt đầu nhận dạng giọng nói.');
-            }
-        }
-    });
+    // Dịch các lỗi phổ biến sang Tiếng Việt để thân thiện hơn
+    switch (event.error) {
+        case 'no-speech':
+            errorMessage = "Không phát hiện thấy giọng nói. Vui lòng thử lại.";
+            break;
+        case 'not-allowed':
+        case 'service-not-allowed':
+            errorMessage = "Bạn cần cấp quyền truy cập micro cho trình duyệt và website này.";
+            break;
+        case 'network':
+            errorMessage = "Lỗi mạng, không thể kết nối đến dịch vụ nhận dạng giọng nói.";
+            break;
+        case 'audio-capture':
+             errorMessage = "Lỗi micro. Không thể thu âm.";
+             break;
+    }
+    
+    addChatMessage('error', errorMessage);
+};
 
 } else {
     // Ẩn nút micro nếu trình duyệt không hỗ trợ

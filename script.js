@@ -116,14 +116,20 @@ function addChatMessage(sender, text) {
     messageBubble.classList.add('message-bubble');
 
     if (sender === 'assistant') {
+        // Convert text to structured HTML for better display
+        let htmlContent = '';
         if (typeof marked === 'function') {
             const correctedMarkdown = preprocessMarkdown(text);
-            const htmlContent = marked.parse(correctedMarkdown);
-            messageBubble.innerHTML = htmlContent;
+            htmlContent = marked.parse(correctedMarkdown);
+            // Enhance list styling to match the image
+            htmlContent = htmlContent.replace(/<li>/g, '<li style="margin-bottom: 0.5rem;">• ');
         } else {
             console.error("marked.js library not found! Displaying raw text with <br>.");
-            messageBubble.innerHTML = text.replace(/\n/g, '<br>');
+            htmlContent = text.replace(/\n/g, '<br>');
+            // Manually add bullet points for lists
+            htmlContent = htmlContent.replace(/^(\s*)\*/gm, '$1• ');
         }
+        messageBubble.innerHTML = htmlContent;
     } else {
         messageBubble.textContent = text;
     }
@@ -137,7 +143,6 @@ function addChatMessage(sender, text) {
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
 }
 
-// <<< HÀM ĐƯỢC CẬP NHẬT LẦN CUỐI - BIỂU THỨC REGEX MẠNH HƠN >>>
 /**
  * Chuẩn hóa văn bản Markdown không chuẩn trước khi phân tích.
  * @param {string} text - Văn bản thô từ AI.
@@ -147,22 +152,12 @@ function preprocessMarkdown(text) {
     if (!text) return '';
     let correctedText = text;
 
-    // QUY TẮC 1 (Giữ nguyên): Đảm bảo có khoảng trắng sau dấu hoa thị của danh sách.
-    // Ví dụ: '*Tổng số' -> '* Tổng số'.
+    // Ensure space after bullets and proper list formatting
     correctedText = correctedText.replace(/^( *)(\*)[ ]*([^\s*])/gm, '$1$2 $3');
-
-    // >>> THÊM MỚI - QUY TẮC 2 <<<
-    // Đảm bảo có một dòng trống giữa một đoạn văn bản/tiêu đề và một danh sách.
-    // Nó sẽ tìm một dòng không phải là mục danh sách, theo sau là một dòng là mục danh sách,
-    // và chèn một dòng trống vào giữa.
-    // Ví dụ: "Heading\n* Item" -> "Heading\n\n* Item"
     correctedText = correctedText.replace(/([^\n])\n(\* )/g, '$1\n\n$2');
-
-
-    // QUY TẮC 3 (Giữ nguyên): Chuyển đổi cú pháp in đậm (nếu AI vẫn dùng ***) thành chuẩn (**)
     correctedText = correctedText.replace(/\*{3}(.*?)\*{3}/g, '**$1**');
-    
-    console.log("Markdown sau khi được tự động sửa lỗi:", correctedText); // Dòng log để kiểm tra
+
+    console.log("Markdown sau khi được tự động sửa lỗi:", correctedText);
     return correctedText;
 }
 

@@ -229,12 +229,13 @@ async function sendChatMessage() {
         if (!response.ok) {
              throw new Error(data.message || `Lỗi HTTP: ${response.status} ${response.statusText}`);
         }
-        const answer = data.answer;
-        if (answer) {
-            addChatMessage('assistant', answer);
+       const output = data.output;
+        if (output) {
+            addChatMessage('assistant', output);
         } else {
-             addChatMessage('error', 'Phản hồi chat nhận được không hợp lệ (thiếu key "answer").');
-             console.warn('Chat received data without expected "answer" key:', data);
+             // Cập nhật thông báo lỗi để phản ánh key mới
+             addChatMessage('error', 'Phản hồi chat nhận được không hợp lệ (thiếu key "output").');
+             console.warn('Chat received data without expected "output" key:', data);
         }
     } catch (error) {
         removeTypingIndicator();

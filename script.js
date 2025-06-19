@@ -144,24 +144,6 @@ function addChatMessage(sender, text) {
 }
 
 /**
- * Chuẩn hóa văn bản Markdown không chuẩn trước khi phân tích.
- * @param {string} text - Văn bản thô từ AI.
- * @returns {string} - Văn bản Markdown đã được sửa lỗi.
- */
-function preprocessMarkdown(text) {
-    if (!text) return '';
-    let correctedText = text;
-
-    // Ensure space after bullets and proper list formatting
-    correctedText = correctedText.replace(/^( *)(\*)[ ]*([^\s*])/gm, '$1$2 $3');
-    correctedText = correctedText.replace(/([^\n])\n(\* )/g, '$1\n\n$2');
-    correctedText = correctedText.replace(/\*{3}(.*?)\*{3}/g, '**$1**');
-
-    console.log("Markdown sau khi được tự động sửa lỗi:", correctedText);
-    return correctedText;
-}
-
-/**
  * Hiển thị chỉ báo đang chờ phản hồi (typing indicator).
  */
 function showTypingIndicator() {
@@ -340,8 +322,7 @@ function initializeChatSelection() {
 
 // --- Gán sự kiện & Khởi tạo ---
 document.addEventListener('DOMContentLoaded', () => {
-    // ... (Toàn bộ phần này giữ nguyên như trước)
-    if (chatSection) {
+      if (chatSection) {
         initializeChatSelection();
     } else {
         console.error("Không tìm thấy phần tử #chat-section.");

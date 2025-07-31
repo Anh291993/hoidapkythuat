@@ -251,7 +251,7 @@ function setActiveChat(linkElement) {
     currentWebhookUrl = webhookUrl;
     console.log(`New session for topic "${topicName}" started. ID: ${currentSessionId}, URL: ${currentWebhookUrl}`);
     if (chatBox) chatBox.innerHTML = '';
-    addChatMessage('assistant', `Bắt đầu chat về chủ đề: ${topicName}.`);
+    addChatMessage('assistant', `Bắt đầu chat về chủ đề: ${topicName}. Bạn có thể xem trực tiếp sổ tay bằng cách click vào biểu tượng bên dưới góc trái của website này.`);
     if (chatTitleDesktop) chatTitleDesktop.textContent = topicName;
     if (chatTitleMobile) chatTitleMobile.textContent = topicName;
     const allChatLinks = document.querySelectorAll('.chat-topic-link');
